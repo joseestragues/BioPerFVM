@@ -2,7 +2,8 @@
 #include <immintrin.h>
 #include<chrono>
 #include<fstream>
-#include "./microenvironment.h"
+#include "../microenvironment.h"
+#include "./apply.cpp"
 
 
 void microenvironment::diffusion_decay_3D_solver()
@@ -19,6 +20,7 @@ void microenvironment::diffusion_decay_3D_solver()
     auto end_time = std::chrono::high_resolution_clock::now();
     auto apply_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     //cout << "Peto aqui!" << endl;
+    
     start_time = std::chrono::high_resolution_clock::now();
     //X-diffusion vector_x_v2
     //start_time = std::chrono::high_resolution_clock::now();
@@ -214,14 +216,13 @@ void microenvironment::diffusion_decay_3D_solver()
         /*-----------------------------------------------------------------------------------*/
         
         //cout << "Rank " << rank << " starting backward substitution" << endl;
-
+    
         if (mpi_rank == (mpi_size - 1))
         {
             for (int step = 0; step < granurality; ++step)
             {
                 int initial_index = ((x_size - 1)*i_jump) + (step * snd_data_size);
                 #pragma omp parallel for
-
                 for (int index = initial_index; index < initial_index + snd_data_size; index += number_of_densities)
                 {
                     int index_aux = index;
@@ -358,14 +359,18 @@ void microenvironment::diffusion_decay_3D_solver()
     end_time = std::chrono::high_resolution_clock::now();
     auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
 
+    
+
     if (mpi_rank == 0)
         file << duration_us << ",";
     start_time = std::chrono::high_resolution_clock::now();
     apply_dirichlet_conditions_boundaries();
     end_time = std::chrono::high_resolution_clock::now();
-    apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count(); 
     //Y-diffusion
-    start_time = std::chrono::high_resolution_clock::now();
+    //auto start_time = std::chrono::high_resolution_clock::now();
+    
+    
     #pragma omp parallel for collapse(2)
     for (int k = 0; k < z_size; k++)
     {
@@ -412,17 +417,17 @@ void microenvironment::diffusion_decay_3D_solver()
             }
         }
     }
-    end_time = std::chrono::high_resolution_clock::now();
-    duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-    if (mpi_rank == 0)
-        file << duration_us << ",";
+    //auto end_time = std::chrono::high_resolution_clock::now();
+    //auto duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    //if (mpi_rank == 0)
+    //    file << duration_us << ",";
     apply_dirichlet_conditions_boundaries();
-    end_time = std::chrono::high_resolution_clock::now();
-    apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    //end_time = std::chrono::high_resolution_clock::now();
+    //apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
     //Z-diffusion
     //cout << "Peto aqui 3!" << endl;
 
-    start_time = std::chrono::high_resolution_clock::now();
+    //start_time = std::chrono::high_resolution_clock::now();
     #pragma omp parallel for collapse(2)
     for (int i = 0; i < x_size; i++)
         {
@@ -443,7 +448,7 @@ void microenvironment::diffusion_decay_3D_solver()
                 // axpy(&(*M.p_density_vectors)[n], M.thomas_constant1, (*M.p_density_vectors)[n - M.thomas_k_jump]);
                 for (int d = 0; d < number_of_densities; d++)
                 {
-                    densities[index_inc + d] += densities[d] * densities[index + d];
+                    densities[index_inc + d] += thomas_constant1[d] * densities[index + d];
                 }
                 //(*M.p_density_vectors)[n] /= M.thomas_denomz[k];
                 for (int d = 0; d < number_of_densities; d++)
@@ -468,16 +473,16 @@ void microenvironment::diffusion_decay_3D_solver()
             }
         }
     }
-    end_time = std::chrono::high_resolution_clock::now();
-    duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-    if (mpi_rank == 0)
-        file << duration_us << ",";
+    //end_time = std::chrono::high_resolution_clock::now();
+    //duration_us = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    //if (mpi_rank == 0)
+    //    file << duration_us << ",";
     
-    start_time = std::chrono::high_resolution_clock::now();
+    //start_time = std::chrono::high_resolution_clock::now();
     apply_dirichlet_conditions_boundaries();
-    end_time = std::chrono::high_resolution_clock::now();
-    apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-     if (mpi_rank == 0)
-            file << apply_us/4.0 << std::endl;
+    //end_time = std::chrono::high_resolution_clock::now();
+    //apply_us += std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+    // if (mpi_rank == 0)
+    //        file << apply_us/4.0 << std::endl;
 
 }

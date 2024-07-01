@@ -4,6 +4,7 @@
 #include<vector>
 #include<chrono>
 #include<mpi.h>
+#include"./omp/microenvironment_omp.h"
 using namespace std;
 class microenvironment {
     public:
@@ -39,6 +40,7 @@ class microenvironment {
         //Dirichlet conditions
         vector<int> dirichlet_indices;
         int gvec_size;
+        int vl;
 
         void init_densities();
 
@@ -56,6 +58,8 @@ class microenvironment {
         void diffusion_decay_3D_solver_256D();
         void diffusion_decay_3D_solver_512D(); 
 
+        bool compare_microenvironment(microenvironment_omp reference);
+        void print_voxels_densities(std::string *file_name);
         microenvironment();
 };
 #endif

@@ -11,8 +11,13 @@ FLAGS := -march=$(ARCH) -O3 -fomit-frame-pointer -fopenmp  -std=c++11 -fpermissi
 
 COMPILE_COMMAND := $(CC) $(FLAGS)
 
-Tridiagonals_OBJECTS := utils.o microenvironment.o kernels.o
+Tridiagonals_OBJECTS := utils.o microenvironment.o apply_omp.o microenvironment_omp.o solver_omp.o solver.o solver_256d.o solver_512d.o
 
+correctness: ./tests/correctness.cpp $(Tridiagonals_OBJECTS)
+	$(COMPILE_COMMAND) -o correctness ./tests/correctness.cpp $(Tridiagonals_OBJECTS)
+
+correctness256: ./tests/correctness_avx256.cpp $(Tridiagonals_OBJECTS)
+	$(COMPILE_COMMAND) -o correctness_avx256 ./tests/correctness_avx256.cpp $(Tridiagonals_OBJECTS)
 
 tridiagonals: ./tests/tridiagonals.cpp $(Tridiagonals_OBJECTS)
 	    $(COMPILE_COMMAND) -o tridiagonals tridiagonals.cpp $(Tridiagonals_OBJECTS)
@@ -47,10 +52,22 @@ solver_256d.o: ./kernels/solver_256d.cpp
 	$(COMPILE_COMMAND) -c ./kernels/solver_256d.cpp
 
 solver_512d.o: ./kernels/solver_512d.cpp
-	$(COMPILE_COMMAND) -c ./kernels/kernels_512d.cpp
+	$(COMPILE_COMMAND) -c ./kernels/solver_512d.cpp
 
+#Compile OMP
+apply_omp.o: ./omp/apply_omp.cpp
+	$(COMPILE_COMMAND) -c ./omp/apply_omp.cpp
+
+microenvironment_omp.o: ./omp/microenvironment_omp.cpp
+	$(COMPILE_COMMAND) -c ./omp/microenvironment_omp.cpp
+
+solver_omp.o: ./omp/solver_omp.cpp
+	$(COMPILE_COMMAND) -c ./omp/solver_omp.cpp
 
 
 clean:
 	rm -f tridiagonals
+	rm -f correctness
 	rm -f *.o
+	rm -f correctness_avx256
+	rm -f m_omp.txt m_mpi.txt

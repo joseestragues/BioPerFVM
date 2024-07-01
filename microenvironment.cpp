@@ -37,12 +37,15 @@ void microenvironment::init_densities(){
     #pragma omp parallel for collapse(2)
     for (int k = 0; k < z_size; ++k) {
         for (int j = 0; j < y_size; ++j){
-            int voxel = p_index(0,j,k);
-            for (int d = 0; d < number_of_densities; ++d)
-                densities[voxel+d]=100;
-            voxel = p_index(x_size -1,j,k);
-            for (int d = 0; d < number_of_densities; ++d)
-                densities[voxel+d]=100;
+            if (mpi_rank == 0) {
+                int voxel = p_index(0,j,k);
+                for (int d = 0; d < number_of_densities; ++d)
+                    densities[voxel+d]=100;}
+            
+            if (mpi_rank == mpi_size -1) {
+                int voxel = p_index(x_size -1,j,k);
+                for (int d = 0; d < number_of_densities; ++d)
+                    densities[voxel+d]=100;}
         }
     }
     #pragma omp parallel for collapse(2)
@@ -171,6 +174,7 @@ void microenvironment::init_diffusion_coeficients(double cube_side, double delta
     int voxels = cube_side/delta;
     MPI_Request send_req[mpi_size];
     MPI_Request recv_req[mpi_size];
+    this->vl = vl;
 
     if (size == 0){
         std::cout << "Error: Number of MPI processes is equal to 0!" << std::endl;
@@ -404,7 +408,7 @@ void microenvironment::init_diffusion_coeficients(double cube_side, double delta
     } 
 }
 
-void microenvironment::init_vec_coeficients( int vl) {
+void microenvironment::init_diffvec_coefficients() {
     //Vectorization initialization
     gvec_size = lcm(number_of_densities, vl);
     
@@ -467,3 +471,60 @@ void microenvironment::init_vec_coeficients( int vl) {
     + "/factor_" + std::to_string(factor) +  "/" + std::to_string(mpi_size) + "_node.csv";*/
     
 }
+
+
+bool microenvironment::compare_microenvironment(microenvironment_omp reference) {
+    int x_offset = (mpi_rank*x_size);
+    bool identical = true;
+    #pragma omp parallel for collapse(3)
+    for (int i = 0; i < x_size; i++)
+    {
+        for (int j = 0; j < y_size; j++)
+        {
+            for (int k = 0; k < z_size; k++)
+            {
+                
+                int index = p_index(i, j, k);
+                int ref_index = reference.voxel_index(i+ x_offset ,j,k);
+                //(*M.p_density_vectors)[n] = densities;
+                for (int d = 0; d < number_of_densities; ++d)
+                {
+                    if (abs((*reference.p_density_vectors)[ref_index][d] - densities[index+d])> 0.00001)
+                        #pragma omp critical
+                        identical = false;
+                }
+            }
+        }
+    }
+
+    return identical;
+}
+
+void microenvironment::print_voxels_densities(std::string *file_name)
+{
+    // std::string filename = std::to_string(rank) + "_" + *file_name;
+    //std::cout << "Rank " << rank << " esta imprimiendo densidades" << std::endl;
+    std::string filename = *file_name;
+    std::ofstream outputFile(filename, std::ios::app);
+    int index = 0;
+    for (int i = 0; i < x_size; i++)
+    {
+        for (int j = 0; j < y_size; j++)
+        {
+            for (int k = 0; k < z_size; k++)
+            {
+                outputFile << (x_size*mpi_rank) + i << " " << j << " " << k << " : ";
+                for (int d = 0; d < number_of_densities; ++d)
+                {
+                    outputFile << densities[index] << " ";
+                    //std::cout << densities[index] << " ";
+                    ++index;
+                }
+                //std::cout << endl;
+                outputFile << std::endl;
+            }
+        }
+    }
+}
+
+

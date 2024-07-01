@@ -2,11 +2,12 @@
 #include <immintrin.h>
 #include<chrono>
 #include<fstream>
-#include "./microenvironment.h"
+#include "../microenvironment.h"
 
 void microenvironment::diffusion_decay_3D_solver_256D() {
-    
-    MPI_Request send_req[granurality], recv_req[granurality];
+
+    int requests = granurality + (snd_data_size_last != 0);
+    MPI_Request send_req[requests], recv_req[requests];
     double block3d[i_jump]; //Aux structure of the size: Y*Z*Substrates
     /*
     string path  = "./timing/voxels_" + std::to_string((int)cube_side/2.0) + "/substrates_" + std::to_string(number_of_densities) 
@@ -85,7 +86,6 @@ void microenvironment::diffusion_decay_3D_solver_256D() {
                 if (mpi_size > 1) {
                     int x_end = x_size - 1;
                     int offset = step * snd_data_size;
-                    MPI_Status status;
                     MPI_Isend(&(densities[x_end * i_jump + offset]), snd_data_size, MPI_DOUBLE, mpi_rank + 1, step, MPI_COMM_WORLD, &send_req[step]);
                 }
             }
@@ -122,7 +122,6 @@ void microenvironment::diffusion_decay_3D_solver_256D() {
                 if (mpi_size > 1) {
                     int x_end = x_size - 1;
                     int offset = granurality * snd_data_size;
-                    MPI_Status status;
                     MPI_Isend(&(densities[x_end * i_jump + offset]), snd_data_size_last, MPI_DOUBLE, mpi_rank + 1, granurality, MPI_COMM_WORLD, &send_req[granurality]);
                     
                 }
@@ -146,14 +145,14 @@ void microenvironment::diffusion_decay_3D_solver_256D() {
                     int limit_vec = limit - (snd_data_size%vl);
                     MPI_Wait(&recv_req[step], MPI_STATUS_IGNORE);
                     #pragma omp parallel for
-                    for (int index = initial_index; index < limit; index += vl)
+                    for (int index = initial_index; index < limit_vec; index += vl)
                     {
                         // axpy(&(*M.microenvironment)[n], M.thomas_constant1, block3d[k][j]);
                         int index_dec = index;
                         int gd = index%gvec_size;
                         __m256d constant1 = _mm256_loadu_pd(&gthomas_constant1[gd]);
-                        __m256d density_curr1 = _mm256_loadu_pd(&densities[index]);
-                        __m256d density_inc1 = _mm256_loadu_pd(&block3d[index]);
+                        __m256d density_inc1 = _mm256_loadu_pd(&densities[index]);
+                        __m256d density_curr1 = _mm256_loadu_pd(&block3d[index]);
                         __m256d denomy1 = _mm256_loadu_pd(&gthomas_denomx[0][gd]);
                 
 
@@ -385,8 +384,8 @@ void microenvironment::diffusion_decay_3D_solver_256D() {
                     int index_3d = index - last_xplane;
                     int gd = index_3d%gvec_size;
                     __m256d cy1 = _mm256_loadu_pd(&gthomas_cx[x_size-1][gd]);
-                    __m256d density_curr1 = _mm256_loadu_pd(&densities[index_aux]);
-                    __m256d density_dec1 = _mm256_loadu_pd(&block3d[index_3d]);
+                    __m256d density_dec1 = _mm256_loadu_pd(&densities[index_aux]);
+                    __m256d density_curr1 = _mm256_loadu_pd(&block3d[index_3d]);
 
                     density_curr1 = _mm256_fnmadd_pd(cy1, density_curr1, density_dec1);
 
@@ -618,7 +617,7 @@ void microenvironment::diffusion_decay_3D_solver_256D() {
                 // axpy(&(*M.p_density_vectors)[n], M.thomas_constant1, (*M.p_density_vectors)[n - M.thomas_k_jump]);
                 for (int d = 0; d < number_of_densities; d++)
                 {
-                    densities[index_inc + d] += densities[d] * densities[index + d];
+                    densities[index_inc + d] += thomas_constant1[d] * densities[index + d];
                 }
                 //(*M.p_density_vectors)[n] /= M.thomas_denomz[k];
                 for (int d = 0; d < number_of_densities; d++)

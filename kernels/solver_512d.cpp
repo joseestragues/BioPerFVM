@@ -2,7 +2,7 @@
 #include <immintrin.h>
 #include<chrono>
 #include<fstream>
-#include "./microenvironment.h"
+#include "../microenvironment.h"
 
 void microenvironment::diffusion_decay_3D_solver_512D() {
     
